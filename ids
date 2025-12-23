@@ -1,0 +1,170 @@
+/* Generated Code (IMPORT) */
+/* Source File: ASSIGNMENTIDS.csv */
+/* Source Path: /home/u64366492/GROUP ASSIGNMENT */
+
+/* 1. Downloading/importing data in SAS */
+%web_drop_table(WORK.IMPORT);
+FILENAME REFFILE '/home/u64366492/GROUP ASSIGNMENT/ASSIGNMENTIDS.csv';
+
+PROC IMPORT DATAFILE=REFFILE
+	DBMS=CSV
+	OUT=WORK.IMPORT;
+	GETNAMES=YES;
+RUN;
+PROC CONTENTS DATA=WORK.IMPORT; RUN;
+%web_open_table(WORK.IMPORT);
+
+/* verify import */
+proc print data = work.import (obs = 10);
+	title "Step 1: FIRST 10 ROWS OF ROW DATA";
+run;
+
+proc contents data = work.import;
+	title "DATA STRUCTURE OVERVIEW";
+run;
+
+/* 2. Cleaning, Transforming Data and Running queries on data */
+/* check missing values */
+data work.import_clean;
+	set work.import;
+	
+	streetName_miss = missing (street_name);
+	address_miss = missing (address);
+	POI_miss = missing (point_of_interest);
+	addInfo_miss = missing (additional_info);
+	latlong_miss = missing (lat_long);
+	total_missing = streetName_miss + address_miss + POI_miss + addInfo_miss + latlong_miss;
+	
+		if not missing (lat_long) then do;
+			lat = scan (lat_long, 1, ',');
+			long = scan (lat_long, 2, ',');
+			
+			latitude = input (lat, best.);
+			longitude = input (long, best.);
+			
+			comma_count = count (lat_long, ',');
+			if comma_count ne 1 then lat_long_format = 'Invalid';
+			else lat_long_format = 'Valid';
+		end;
+		else do;
+		
+			latitude = .;
+			longitude = .;
+			lat_long_format = 'Missing';
+		end;
+		
+		/*create varible street_type*/
+		length street_type $15;
+		if not missing (street_name) then do;
+			first_word = upcase(scan(street_name, 1, ''));
+			
+			if first_word = "JALAN" then street_type = "Jalan";
+			else if first_word = "PERSIARAN" then street_type ="Persiaran";
+			else if first_word = "LINGKARAN" then street_type ="Lingkaran";
+			else if first_word = "PARSIARAN" then street_type ="Parsiaran";
+			else street_type = "Other";
+		end;
+		else do;
+			street_type = "Missing";
+		end;
+		drop lat long first_word;
+	
+	/*create region*/
+	length region $10;
+	if not missing (latitude) then do;
+		if latitude >= 2.93 then region = "North";
+		else if latitude <= 2.91 then region = "South";
+		else region = "Central";
+	end;
+	else region = "Unknown";
+	
+	/*create has_POI*/
+	has_POI_num = not missing (point_of_interest);
+	if not missing (point_of_interest) then has_POI = "Yes";
+	else has_POI = "No";
+	
+	/*create has_addinfo */
+	if not missing (additional_info) then has_addinfo = "Yes";
+	else has_addinfo = "No";
+	
+	drop lat long first_word;
+run;
+	
+	
+/*summary of missing values*/
+proc means data = work.import_clean n nmiss mean;
+	var streetName_miss address_miss POI_miss addInfo_miss latlong_miss;
+	title "Missing Values in Character Variable";
+run;
+
+/* frequency counts */
+proc freq data = work.import_clean;
+	tables lat_long_format;
+	title "Lat Long Field Format Check";
+run;
+
+/*show rows with missing street names*/
+proc print data = work.import_clean;
+	where streetName_miss = 1;
+	var street_name point_of_interest latitude longitude;
+	title "Rows with Missing Street Names";
+run;
+
+/* 3. Basic data analysis using Descriptive Statistics */
+/* descriptive statistics for numeric variables */
+proc means data = work.import_clean n mean std min max median;
+	var latitude longitude;
+	title "Step 3: Descriptive Statistics - Coordinates";
+run;
+
+proc freq data = work.import_clean;
+	tables street_type region has_POI / nocum nopercent;
+	title "Frequency Distributions of Categorical Variables";
+run;
+
+proc corr data = work.import_clean;
+	var latitude longitude;
+	title "Correlation between Latitude & Longitude";
+run;
+
+/* 4. Inferential statistics and regression modelling */
+/*t-test: compare latitude between different street types*/
+proc ttest data = work.import_clean;
+	class street_type;
+	var latitude;
+	where street_type in ('Jalan', 'Persiaran');
+	title "Step 4: T-test - Latitude Comparison (Jalan vs Persiaran)";
+run;
+
+/*Chi-square test: Association between region and street type*/
+proc freq data = work.import_clean;
+	tables region * street_type / chisq;
+	title "Chi-square Test: Association between Region and Street Type";
+run;
+
+/*Linear Regression: Predict longitude based on latitude*/
+proc reg data = work.import_clean;
+	model longitude = latitude;
+	title "Linear Regression: Predict Longitude from Latitude";
+	output out = reg_results predicted = pred_long residual = resid;
+run;
+
+/* Cluster analysis to identify geographical groups */
+proc fastclus data = work.import_clean maxclusters = 3 out = clusters;
+	var latitude longitude;
+	title "Cluster Analysis: Geographical Grouping of Bus Stops";
+run;
+
+/* 5. Plotting Data Distribution */
+/*histograms with normal distribution curve*/
+proc sgplot data = work.import_clean;
+	histogram latitude;
+	density latitude / type = normal;
+	title "Step 5: Distribution of Latitude Values";
+run;
+
+proc sgplot data = work.import_clean;
+	histogram longitude;
+	density longitude / type = normal;
+	title "Distribution of Longitude Values";
+run;
