@@ -28,6 +28,8 @@ run;
 data work.import_clean;
 	set work.import;
 	
+	
+	
 	streetName_miss = missing (street_name);
 	address_miss = missing (address);
 	POI_miss = missing (point_of_interest);
@@ -61,7 +63,6 @@ data work.import_clean;
 			if first_word = "JALAN" then street_type = "Jalan";
 			else if first_word = "PERSIARAN" then street_type ="Persiaran";
 			else if first_word = "LINGKARAN" then street_type ="Lingkaran";
-			else if first_word = "PARSIARAN" then street_type ="Parsiaran";
 			else street_type = "Other";
 		end;
 		else do;
@@ -92,7 +93,7 @@ run;
 	
 	
 /*summary of missing values*/
-proc means data = work.import_clean n nmiss mean;
+proc means data = work.import_clean n nmiss;
 	var streetName_miss address_miss POI_miss addInfo_miss latlong_miss;
 	title "Missing Values in Character Variable";
 run;
@@ -136,9 +137,27 @@ proc ttest data = work.import_clean;
 	title "Step 4: T-test - Latitude Comparison (Jalan vs Persiaran)";
 run;
 
+/* prtform one-way ANOVA */
+proc anova data=work.import_clean;
+    class street_type;
+    where street_type in ('Jalan', 'Persiaran', 'Lingkaran');
+    model latitude = street_type;
+    means street_type / tukey cldiff;
+    title "One-way ANOVA: Latitude Differences (Selected Street Types)";
+run;
+
+/* perform two-way ANOVA*/
+proc anova data=work.import_clean;
+    class street_type region;
+    model latitude = street_type region;
+    means street_type region / tukey cldiff;
+    title "Two-way ANOVA: Latitude by Street Type and Region (with Interaction)";
+run;
+
 /*Chi-square test: Association between region and street type*/
 proc freq data = work.import_clean;
-	tables region * street_type / chisq;
+	tables street_type*region / chisq;
+	weight latitude;
 	title "Chi-square Test: Association between Region and Street Type";
 run;
 
@@ -146,7 +165,6 @@ run;
 proc reg data = work.import_clean;
 	model longitude = latitude;
 	title "Linear Regression: Predict Longitude from Latitude";
-	output out = reg_results predicted = pred_long residual = resid;
 run;
 
 /* Cluster analysis to identify geographical groups */
@@ -167,4 +185,10 @@ proc sgplot data = work.import_clean;
 	histogram longitude;
 	density longitude / type = normal;
 	title "Distribution of Longitude Values";
+run;
+
+data work.plot_data;
+    set work.import_clean;
+    lat_bin = 10*floor(latitude/10);  * 10-degree bins;
+    long_bin = 20*floor(longitude/20); * 20-degree bins;
 run;
