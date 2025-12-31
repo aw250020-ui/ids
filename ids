@@ -1,8 +1,3 @@
-/* Generated Code (IMPORT) */
-/* Source File: ASSIGNMENTIDS.csv */
-/* Source Path: /home/u64366492/GROUP ASSIGNMENT */
-
-/* 1. Downloading/importing data in SAS */
 %web_drop_table(WORK.IMPORT);
 FILENAME REFFILE '/home/u64366492/GROUP ASSIGNMENT/ASSIGNMENTIDS.csv';
 
@@ -11,24 +6,26 @@ PROC IMPORT DATAFILE=REFFILE
 	OUT=WORK.IMPORT;
 	GETNAMES=YES;
 RUN;
-PROC CONTENTS DATA=WORK.IMPORT; RUN;
+proc contents data = work.import;
+run;
+
 %web_open_table(WORK.IMPORT);
 
 /* verify import */
 proc print data = work.import (obs = 10);
-	title "Step 1: FIRST 10 ROWS OF ROW DATA";
+title "Step 1";
 run;
 
-proc contents data = work.import;
-	title "DATA STRUCTURE OVERVIEW";
+/* frequency counts */
+proc freq data = work.import;
+	tables street_name address point_of_interest additional_info lat_long / missing;
+	title "Missing Values Analysis - Character Variables";
 run;
 
 /* 2. Cleaning, Transforming Data and Running queries on data */
 /* check missing values */
 data work.import_clean;
 	set work.import;
-	
-	
 	
 	streetName_miss = missing (street_name);
 	address_miss = missing (address);
@@ -93,16 +90,6 @@ run;
 	
 	
 /*summary of missing values*/
-proc means data = work.import_clean n nmiss;
-	var streetName_miss address_miss POI_miss addInfo_miss latlong_miss;
-	title "Missing Values in Character Variable";
-run;
-
-/* frequency counts */
-proc freq data = work.import_clean;
-	tables lat_long_format;
-	title "Lat Long Field Format Check";
-run;
 
 /*show rows with missing street names*/
 proc print data = work.import_clean;
@@ -110,6 +97,7 @@ proc print data = work.import_clean;
 	var street_name point_of_interest latitude longitude;
 	title "Rows with Missing Street Names";
 run;
+
 
 /* 3. Basic data analysis using Descriptive Statistics */
 /* descriptive statistics for numeric variables */
@@ -140,7 +128,6 @@ run;
 /* prtform one-way ANOVA */
 proc anova data=work.import_clean;
     class street_type;
-    where street_type in ('Jalan', 'Persiaran', 'Lingkaran');
     model latitude = street_type;
     means street_type / tukey cldiff;
     title "One-way ANOVA: Latitude Differences (Selected Street Types)";
@@ -149,7 +136,7 @@ run;
 /* perform two-way ANOVA*/
 proc anova data=work.import_clean;
     class street_type region;
-    model latitude = street_type region;
+    model latitude = street_type region street_type*region;
     means street_type region / tukey cldiff;
     title "Two-way ANOVA: Latitude by Street Type and Region (with Interaction)";
 run;
@@ -175,16 +162,14 @@ run;
 
 /* 5. Plotting Data Distribution */
 /*histograms with normal distribution curve*/
-proc sgplot data = work.import_clean;
-	histogram latitude;
-	density latitude / type = normal;
-	title "Step 5: Distribution of Latitude Values";
+proc gchart data=work.import_clean;
+    vbar latitude;
+    title "Simple Histogram of Latitude";
 run;
 
-proc sgplot data = work.import_clean;
-	histogram longitude;
-	density longitude / type = normal;
-	title "Distribution of Longitude Values";
+proc gchart data=work.import_clean;
+    vbar longitude;
+    title "Simple Histogram of Longitude";
 run;
 
 data work.plot_data;
